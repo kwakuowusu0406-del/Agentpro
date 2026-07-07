@@ -1,0 +1,1195 @@
+openapi: 3.0.3
+info:
+  title: Agent Pro Ghana API
+  description: |
+    REST API for Agent Pro Ghana — One App. Every Mobile Money Business.
+
+    ## Authentication
+    All protected endpoints require a Bearer JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+
+    Access tokens expire in **15 minutes**. Use the `/auth/refresh` endpoint with
+    your refresh token to obtain a new access token without re-logging in.
+
+    ## Roles
+    | Role | Description |
+    |------|-------------|
+    | `superuser` | Platform administrator — full access |
+    | `business_owner` | Company owner — manages branches, agents, reports |
+    | `manager` | Branch manager — monitors agents and float |
+    | `agent` | Field agent — processes MoMo transactions |
+    | `auditor` | Read-only access to company data |
+
+    ## Security Notice
+    This API **never** requests, stores, or transmits a MoMo PIN.
+    PIN entry happens exclusively on the official network USSD overlay.
+
+  version: 2.0.0
+  contact:
+    name: Agent Pro Ghana Support
+    email: dev@agentproghana.com
+    url: https://agentproghana.com
+
+servers:
+  - url: https://api.agentproghana.com/v1
+    description: Production
+  - url: http://localhost:3000/v1
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication and session management
+  - name: Users
+    description: User management (agents, managers, auditors)
+  - name: Branches
+    description: Branch management
+  - name: Transactions
+    description: Mobile Money transactions
+  - name: Float
+    description: Float balance management
+  - name: Commissions
+    description: Commission rules and summaries
+  - name: Subscriptions
+    description: Business Plan subscription management
+  - name: Marketplace
+    description: Market Centre advertisements
+  - name: Reports
+    description: PDF, Excel, CSV report generation
+  - name: AI
+    description: AI assistant powered by Anthropic Claude
+  - name: Notifications
+    description: Push notification management
+  - name: Admin
+    description: Superuser administration (restricted)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Validation failed
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_pages:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [superuser, business_owner, manager, agent, auditor, customer]
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        company_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, suspended, deactivated]
+        created_at:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+          example: APG-1719000000-ABC123
+        network_reference:
+          type: string
+        provider:
+          type: string
+          enum: [mtn, telecel, at_money]
+        transaction_type:
+          type: string
+          enum: [cash_in, cash_out, send_money, merchant_payment, bill_payment, airtime, data_bundle, balance_enquiry, mini_statement, reversal]
+        status:
+          type: string
+          enum: [initiated, processing, success, failed, reversed, pending_confirmation]
+        amount:
+          type: number
+          format: float
+          example: 250.00
+        customer_phone:
+          type: string
+          example: "0241234567"
+        customer_name:
+          type: string
+        receipt_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    FloatAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        branch_id:
+          type: string
+          format: uuid
+        branch_name:
+          type: string
+        provider:
+          type: string
+          enum: [mtn, telecel, at_money]
+        current_balance:
+          type: number
+          format: float
+        low_balance_threshold:
+          type: number
+          format: float
+        last_updated_at:
+          type: string
+          format: date-time
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        plan:
+          type: string
+          enum: [free, business]
+        status:
+          type: string
+          enum: [pending, active, grace_period, suspended, cancelled]
+        amount:
+          type: number
+          example: 10.00
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+security:
+  - BearerAuth: []
+
+paths:
+
+  # ── AUTH ────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new Business Owner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_name, first_name, last_name, email, phone, password]
+              properties:
+                company_name:
+                  type: string
+                  example: Kwame MoMo Services
+                registration_number:
+                  type: string
+                  example: GH-BUS-123456
+                first_name:
+                  type: string
+                  example: Kwame
+                last_name:
+                  type: string
+                  example: Mensah
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                  example: "0241234567"
+                password:
+                  type: string
+                  minLength: 8
+                  example: SecurePass123
+                ghana_card_number:
+                  type: string
+      responses:
+        '201':
+          description: Registration submitted — pending superuser approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '409':
+          description: Email already registered
+        '422':
+          description: Validation error
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                fcm_token:
+                  type: string
+                  description: Firebase Cloud Messaging token for push notifications
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      access_token:
+                        type: string
+                      refresh_token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Account pending approval or suspended
+        '423':
+          description: Account temporarily locked
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New access token issued
+        '401':
+          description: Invalid or expired refresh token
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and revoke tokens
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset email sent (always returns 200 for security)
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using token from email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, token, new_password]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          description: Invalid or expired token
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user profile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  # ── TRANSACTIONS ────────────────────────────────────────────
+
+  /transactions:
+    post:
+      tags: [Transactions]
+      summary: Initiate a Mobile Money transaction
+      description: |
+        Creates a transaction record and returns the USSD template
+        for the Flutter app to execute automation.
+
+        **Security**: The USSD template returned includes `pin_prompt_strings`,
+        substrings that tell the automation engine when the network's response
+        indicates a PIN prompt so it can PAUSE there. `ussd_string_pattern` is
+        dialed as a single request and never contains a PIN placeholder — PIN
+        entry is handled entirely by the network/OS, outside this API and the
+        app's code. See migration 002_ussd_single_dial_redesign.sql for why
+        USSD automation uses a single combined dial string rather than
+        step-by-step menu navigation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, transaction_type, amount, branch_id]
+              properties:
+                provider:
+                  type: string
+                  enum: [mtn, telecel, at_money]
+                transaction_type:
+                  type: string
+                  enum: [cash_in, cash_out, send_money, merchant_payment, bill_payment, airtime, data_bundle, balance_enquiry, mini_statement]
+                amount:
+                  type: number
+                  minimum: 1
+                  example: 250.00
+                branch_id:
+                  type: string
+                  format: uuid
+                customer_phone:
+                  type: string
+                  example: "0241234567"
+                customer_name:
+                  type: string
+                recipient_phone:
+                  type: string
+                  description: Required for send_money
+                biller_code:
+                  type: string
+                  description: Required for bill_payment
+                account_number:
+                  type: string
+      responses:
+        '201':
+          description: Transaction initiated with USSD template
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      transaction_id:
+                        type: string
+                        format: uuid
+                      reference:
+                        type: string
+                      status:
+                        type: string
+                        example: initiated
+                      ussd_template:
+                        type: object
+                        description: USSD automation template for the Flutter app
+                      automation_params:
+                        type: object
+                        description: Pre-filled values for USSD steps
+        '400':
+          description: Insufficient float or invalid branch
+        '403':
+          description: Subscription inactive or inactive branch
+
+    get:
+      tags: [Transactions]
+      summary: List transactions with filters
+      parameters:
+        - in: query
+          name: provider
+          schema:
+            type: string
+            enum: [mtn, telecel, at_money]
+        - in: query
+          name: transaction_type
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [initiated, processing, success, failed, reversed]
+        - in: query
+          name: branch_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: from_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: search
+          schema:
+            type: string
+            description: Search by reference or customer phone
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated transaction list
+
+  /transactions/{transaction_id}:
+    get:
+      tags: [Transactions]
+      summary: Get a single transaction by ID
+      parameters:
+        - in: path
+          name: transaction_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction details
+
+  /transactions/{transaction_id}/complete:
+    patch:
+      tags: [Transactions]
+      summary: Complete a transaction after USSD execution
+      description: Called by Flutter app after USSD automation finishes. Reports success or failure.
+      parameters:
+        - in: path
+          name: transaction_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [success, failed, pending_confirmation]
+                  description: |
+                    pending_confirmation means the outcome could not be
+                    determined (e.g. no further network response arrived
+                    after a PIN prompt). This is deliberately distinct from
+                    'failed' — the transaction may have actually succeeded,
+                    so float and commission are NOT updated for this status,
+                    and the agent is told to verify manually rather than
+                    assume it's safe to retry.
+                network_reference:
+                  type: string
+                  description: Operator's transaction ID extracted from USSD response
+                failure_reason:
+                  type: string
+                ussd_session_log:
+                  type: array
+                  description: USSD automation trace — PIN steps are NOT logged
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Transaction completed
+
+  # ── FLOAT ───────────────────────────────────────────────────
+
+  /float/overview:
+    get:
+      tags: [Float]
+      summary: Get float overview for all branches (company-scoped)
+      responses:
+        '200':
+          description: Float accounts grouped by branch and provider
+
+  /float/branch/{branch_id}:
+    get:
+      tags: [Float]
+      summary: Get float balances for a specific branch
+      parameters:
+        - in: path
+          name: branch_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Branch float accounts
+
+  /float/top-up:
+    post:
+      tags: [Float]
+      summary: Top up float balance for a branch/provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branch_id, provider, amount]
+              properties:
+                branch_id:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                  enum: [mtn, telecel, at_money]
+                amount:
+                  type: number
+                reference:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Float topped up
+
+  /float/history:
+    get:
+      tags: [Float]
+      summary: Get float movement history
+      parameters:
+        - in: query
+          name: branch_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: provider
+          schema:
+            type: string
+        - in: query
+          name: from_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to_date
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Float movement history
+
+  /float/request:
+    post:
+      tags: [Float]
+      summary: Submit float request from agent to manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branch_id, provider, amount_requested]
+              properties:
+                branch_id:
+                  type: string
+                  format: uuid
+                provider:
+                  type: string
+                  enum: [mtn, telecel, at_money]
+                amount_requested:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Float request submitted
+
+  /float/request/{request_id}/review:
+    patch:
+      tags: [Float]
+      summary: Approve or reject a float request (manager)
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+                review_notes:
+                  type: string
+      responses:
+        '200':
+          description: Request reviewed
+
+  # ── SUBSCRIPTIONS ────────────────────────────────────────────
+
+  /subscriptions/status:
+    get:
+      tags: [Subscriptions]
+      summary: Get current subscription status and payment instructions
+      responses:
+        '200':
+          description: Subscription status with MoMo payment instructions
+
+  /subscriptions/payment:
+    post:
+      tags: [Subscriptions]
+      summary: Submit MoMo payment reference for subscription activation/renewal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [momo_reference, payment_phone]
+              properties:
+                momo_reference:
+                  type: string
+                  description: MTN MoMo transaction reference
+                payment_phone:
+                  type: string
+                  description: Phone number used to make the payment
+                amount:
+                  type: number
+                  default: 10.00
+      responses:
+        '201':
+          description: Payment submitted — pending superuser verification
+
+  /subscriptions/pending-payments:
+    get:
+      tags: [Subscriptions]
+      summary: List all pending subscription payments (superuser only)
+      responses:
+        '200':
+          description: List of pending payment submissions
+
+  /subscriptions/payment/{payment_id}/verify:
+    patch:
+      tags: [Subscriptions]
+      summary: Approve or reject a subscription payment (superuser only)
+      parameters:
+        - in: path
+          name: payment_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject]
+                rejection_reason:
+                  type: string
+      responses:
+        '200':
+          description: Payment verified or rejected
+
+  # ── REPORTS ─────────────────────────────────────────────────
+
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      summary: Get dashboard summary data (JSON)
+      responses:
+        '200':
+          description: Today's stats, monthly totals, float by provider, recent transactions
+
+  /reports/transactions:
+    get:
+      tags: [Reports]
+      summary: Download transaction report (PDF/Excel/CSV)
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [pdf, excel, csv]
+            default: pdf
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [today, week, month, year]
+        - in: query
+          name: from_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: branch_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: provider
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report file download
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+
+  /reports/commissions:
+    get:
+      tags: [Reports]
+      summary: Download commission report (PDF/CSV)
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [pdf, csv]
+            default: pdf
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [month, year]
+        - in: query
+          name: group_by
+          schema:
+            type: string
+            enum: [day, week, month, agent, branch]
+            default: day
+      responses:
+        '200':
+          description: Commission report file download
+
+  # ── AI ASSISTANT ────────────────────────────────────────────
+
+  /ai/chat:
+    post:
+      tags: [AI]
+      summary: Send a message to the AI assistant
+      description: |
+        Powered by Anthropic Claude. The AI assistant helps with:
+        - App feature guidance
+        - Transaction troubleshooting
+        - Float and commission explanations
+        - Subscription and marketplace support
+
+        **Security**: The AI is strictly configured to NEVER request a MoMo PIN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  maxLength: 2000
+                  example: How do I process a Cash In transaction?
+                conversation_id:
+                  type: string
+                  format: uuid
+                  description: Omit to start a new conversation
+      responses:
+        '200':
+          description: AI response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      conversation_id:
+                        type: string
+                        format: uuid
+                      message:
+                        type: string
+                      tokens_used:
+                        type: integer
+
+  /ai/conversations:
+    get:
+      tags: [AI]
+      summary: List user's AI conversations
+      responses:
+        '200':
+          description: List of conversations
+
+  /ai/conversations/{conversation_id}:
+    get:
+      tags: [AI]
+      summary: Get a conversation with full message history
+      parameters:
+        - in: path
+          name: conversation_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation with messages
+
+  # ── ADMIN ───────────────────────────────────────────────────
+
+  /admin/overview:
+    get:
+      tags: [Admin]
+      summary: Platform-wide statistics overview (superuser only)
+      responses:
+        '200':
+          description: Companies, users, transactions, subscriptions counts
+
+  /admin/pending-registrations:
+    get:
+      tags: [Admin]
+      summary: List pending Business Owner registrations (superuser only)
+      responses:
+        '200':
+          description: Pending registrations
+
+  /admin/config:
+    get:
+      tags: [Admin]
+      summary: Get all system configuration values (superuser only)
+      responses:
+        '200':
+          description: System config key-value pairs
+
+  /admin/config/{key}:
+    patch:
+      tags: [Admin]
+      summary: Update a system configuration value (superuser only)
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: string
+      responses:
+        '200':
+          description: Config updated
+
+  /admin/ussd-templates:
+    get:
+      tags: [Admin]
+      summary: Get all USSD templates (superuser only)
+      responses:
+        '200':
+          description: USSD templates for all providers and transaction types
+
+  /admin/ussd-templates/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update a USSD template without requiring app update (superuser only)
+      description: |
+        Templates are dialed as a single combined USSD string per
+        transaction — Android's public USSD API cannot reply to an
+        already-open interactive session, so multi-step menu navigation
+        is not possible without AccessibilityService (which this app
+        does not use). See migration 002_ussd_single_dial_redesign.sql.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ussd_string_pattern:
+                  type: string
+                  example: '*170*1*2*{customer_phone}*{amount}#'
+                  description: |
+                    Single USSD string with {placeholder} tokens, dialed as
+                    ONE request. Must NEVER contain a {pin} placeholder —
+                    rejected with 422 if it does.
+                placeholder_fields:
+                  type: array
+                  items:
+                    type: string
+                  example: ['customer_phone', 'amount']
+                  description: Every {placeholder} used in ussd_string_pattern must be declared here.
+                pin_prompt_strings:
+                  type: array
+                  items:
+                    type: string
+                  description: |
+                    Substrings that indicate the network is showing a PIN
+                    prompt. Cannot be empty — rejected with 422 if it is,
+                    since without it the app cannot recognize when to pause.
+                success_strings:
+                  type: array
+                  items:
+                    type: string
+                failure_strings:
+                  type: array
+                  items:
+                    type: string
+                timeout_seconds:
+                  type: integer
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Template updated
+        '422':
+          description: |
+            Validation failed — e.g. a {pin} placeholder was used,
+            pin_prompt_strings was empty, or a placeholder in the pattern
+            wasn't declared in placeholder_fields.
+        '404':
+          description: Template not found
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Query audit logs (superuser only)
+      parameters:
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: company_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: from_date
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to_date
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit log entries
+
+  /admin/ads/pending:
+    get:
+      tags: [Admin]
+      summary: List advertisements pending moderation (superuser only)
+      responses:
+        '200':
+          description: Pending ads
+
+  /admin/ads/{ad_id}/moderate:
+    patch:
+      tags: [Admin]
+      summary: Approve, reject, or publish an advertisement (superuser only)
+      parameters:
+        - in: path
+          name: ad_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve_review, reject, publish]
+                rejection_reason:
+                  type: string
+      responses:
+        '200':
+          description: Moderation action applied

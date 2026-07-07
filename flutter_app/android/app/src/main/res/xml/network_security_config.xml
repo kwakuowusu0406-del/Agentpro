@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for Agent Pro Ghana
+    Enforces HTTPS-only connections and certificate pinning for the API.
+    Debug builds allow cleartext for local development.
+-->
+<network-security-config>
+
+    <!-- Production API: enforce HTTPS + certificate pinning -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">agentproghana.com</domain>
+        <domain includeSubdomains="true">api.agentproghana.com</domain>
+
+        <!-- Certificate pinning
+             Replace these with your actual certificate SHA-256 hashes from:
+             openssl s_client -connect api.agentproghana.com:443 | openssl x509 -noout -fingerprint -sha256
+        -->
+        <pin-set expiration="2026-01-01">
+            <!-- Primary certificate pin (replace with actual) -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            <!-- Backup pin (replace with actual) -->
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- Cloudinary: HTTPS only -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">res.cloudinary.com</domain>
+        <domain includeSubdomains="true">cloudinary.com</domain>
+    </domain-config>
+
+    <!-- Firebase: HTTPS only -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">firebase.google.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">fcm.googleapis.com</domain>
+    </domain-config>
+
+    <!-- Local development only (debug builds) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+
+    <!-- Default: no cleartext -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+</network-security-config>

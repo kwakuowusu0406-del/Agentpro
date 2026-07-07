@@ -1,0 +1,698 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+
+const API = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' });
+API.interceptors.request.use(cfg => {
+  const t = localStorage.getItem('access_token');
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
+});
+
+// ── Shared Components ─────────────────────────────────────────
+
+export function Badge({ status }) {
+  const colors = {
+    active: 'bg-green-100 text-green-700',
+    pending: 'bg-yellow-100 text-yellow-700',
+    suspended: 'bg-red-100 text-red-700',
+    deactivated: 'bg-gray-100 text-gray-500',
+    success: 'bg-green-100 text-green-700',
+    failed: 'bg-red-100 text-red-700',
+    business: 'bg-blue-100 text-blue-700',
+    free: 'bg-gray-100 text-gray-500',
+  };
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[status] || 'bg-gray-100 text-gray-500'}`}>
+      {status?.replace(/_/g, ' ').toUpperCase()}
+    </span>
+  );
+}
+
+export function Table({ columns, data, loading, emptyMsg = 'No data' }) {
+  if (loading) return <div className="text-center py-16 text-gray-400">Loading...</div>;
+  if (!data.length) return (
+    <div className="text-center py-16 text-gray-400">
+      <p className="text-3xl mb-3">📭</p><p>{emptyMsg}</p>
+    </div>
+  );
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>{columns.map(c => (
+            <th key={c.key} className="text-left px-4 py-3 font-semibold text-gray-600">{c.label}</th>
+          ))}</tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {data.map((row, i) => (
+            <tr key={row.id || i} className="hover:bg-gray-50 transition">
+              {columns.map(c => (
+                <td key={c.key} className="px-4 py-3 text-gray-700">
+                  {c.render ? c.render(row) : row[c.key] ?? '—'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PageHeader({ title, subtitle, action }) {
+  return (
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export function StatCard({ label, value, icon, sub, color = 'primary' }) {
+  const colors = {
+    primary: 'bg-primary/10 text-primary',
+    green: 'bg-green-100 text-green-700',
+    blue: 'bg-blue-100 text-blue-700',
+    yellow: 'bg-yellow-100 text-yellow-700',
+    red: 'bg-red-100 text-red-700',
+  };
+  return (
+    <div className="bg-white rounded-xl p-5 shadow-sm">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-3 ${colors[color]}`}>
+        {icon}
+      </div>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+      <p className="text-sm font-medium text-gray-600 mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Companies Page ────────────────────────────────────────────
+
+export function CompaniesPage() {
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  const load = async () => {
+    try {
+      const res = await API.get('/users?role=business_owner&limit=100');
+      setCompanies(res.data.data || []);
+    } catch (_) {
+      toast.error('Failed to load companies');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const filtered = companies.filter(c =>
+    !search || c.company_name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    try {
+      await API.patch(`/users/${userId}`, { status: newStatus });
+      toast.success(`User ${newStatus}`);
+      load();
+    } catch (_) { toast.error('Action failed'); }
+  };
+
+  return (
+    <div>
+      <PageHeader title="Companies" subtitle="All registered business owners"
+        action={
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search companies..."
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary w-64" />
+        } />
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <Table
+          loading={loading}
+          data={filtered}
+          emptyMsg="No companies found"
+          columns={[
+            { key: 'company_name', label: 'Company' },
+            { key: 'email', label: 'Email' },
+            { key: 'phone', label: 'Phone' },
+            { key: 'subscription_plan', label: 'Plan',
+              render: r => <Badge status={r.subscription_plan || 'free'} /> },
+            { key: 'subscription_status', label: 'Sub Status',
+              render: r => <Badge status={r.subscription_status || 'pending'} /> },
+            { key: 'status', label: 'Account',
+              render: r => <Badge status={r.status} /> },
+            { key: 'created_at', label: 'Joined',
+              render: r => r.created_at ? new Date(r.created_at).toLocaleDateString() : '—' },
+            { key: 'actions', label: '',
+              render: r => (
+                <button onClick={() => toggleStatus(r.id, r.status)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${
+                    r.status === 'active'
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                      : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
+                  }`}>
+                  {r.status === 'active' ? 'Suspend' : 'Activate'}
+                </button>
+              )},
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── USSD Templates Page ───────────────────────────────────────
+
+export function USSDTemplatesPage() {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);
+  const [editJson, setEditJson] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState(null);
+
+  const load = async () => {
+    try {
+      const res = await API.get('/admin/ussd-templates');
+      setTemplates(res.data.data || []);
+    } catch (_) { toast.error('Failed to load templates'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const startEdit = (t) => {
+    setEditing(t);
+    setValidationError(null);
+    setEditJson(JSON.stringify({
+      ussd_string_pattern: t.ussd_string_pattern,
+      placeholder_fields: t.placeholder_fields,
+      pin_prompt_strings: t.pin_prompt_strings,
+      success_strings: t.success_strings,
+      failure_strings: t.failure_strings,
+      timeout_seconds: t.timeout_seconds,
+      retry_count: t.retry_count,
+      is_active: t.is_active,
+    }, null, 2));
+  };
+
+  // Catches the most dangerous mistake an admin could make here: adding
+  // a PIN placeholder to the dial pattern. This is checked client-side
+  // as an immediate guardrail, in addition to whatever the backend does.
+  const validate = (parsed) => {
+    const pattern = parsed.ussd_string_pattern || '';
+    if (/\{pin\}/i.test(pattern)) {
+      return 'ussd_string_pattern must never contain a {pin} placeholder. ' +
+        'PIN entry is always handled by the network/OS, never by this app.';
+    }
+    const usedPlaceholders = [...pattern.matchAll(/\{([a-z_]+)\}/g)].map(m => m[1]);
+    const declared = parsed.placeholder_fields || [];
+    const undeclared = usedPlaceholders.filter(p => !declared.includes(p));
+    if (undeclared.length > 0) {
+      return `Pattern uses {${undeclared.join('}, {')}} but placeholder_fields doesn't list ` +
+        `${undeclared.length > 1 ? 'them' : 'it'}. Add to placeholder_fields so the app knows to supply ${undeclared.length > 1 ? 'these values' : 'this value'}.`;
+    }
+    if (!Array.isArray(parsed.pin_prompt_strings) || parsed.pin_prompt_strings.length === 0) {
+      return 'pin_prompt_strings cannot be empty — without it, the app cannot recognize ' +
+        'a PIN prompt and pause correctly.';
+    }
+    if (parsed.retry_count !== undefined) {
+      if (!Number.isInteger(parsed.retry_count) || parsed.retry_count < 0 || parsed.retry_count > 3) {
+        return 'retry_count must be an integer between 0 and 3. The app only retries a ' +
+          'clean no-response timeout on the initial dial — it never retries after a PIN ' +
+          'prompt has been seen, regardless of this value.';
+      }
+    }
+    return null;
+  };
+
+  const save = async () => {
+    setValidationError(null);
+    let parsed;
+    try {
+      parsed = JSON.parse(editJson);
+    } catch (_) {
+      setValidationError('Invalid JSON — check for missing commas or quotes.');
+      return;
+    }
+
+    const error = validate(parsed);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await API.patch(`/admin/ussd-templates/${editing.id}`, parsed);
+      toast.success('Template updated ✅ (no app update needed)');
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const providerColor = { mtn: 'text-yellow-600', telecel: 'text-red-600', at_money: 'text-blue-600' };
+
+  return (
+    <div>
+      <PageHeader title="USSD Templates"
+        subtitle="Edit USSD dial patterns without releasing an app update" />
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
+        <strong>⚡ Live Updates:</strong> Changes here take effect immediately on all devices.
+        Each template is dialed as ONE combined USSD string (Android cannot reply to an
+        already-open interactive USSD session — see migration 002 for why). Never add a
+        <code className="mx-1 bg-amber-100 px-1 rounded">{'{pin}'}</code>
+        placeholder — PIN entry is always handled by the network/OS, never by this app.
+      </div>
+
+      {loading ? <div className="text-center py-16 text-gray-400">Loading...</div> : (
+        <div className="grid gap-4">
+          {templates.map(t => (
+            <div key={t.id} className="bg-white rounded-xl shadow-sm p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className={`font-bold text-sm uppercase ${providerColor[t.provider]}`}>
+                      {t.provider?.replace('_', ' ')}
+                    </span>
+                    <span className="text-gray-400">·</span>
+                    <span className="font-semibold text-gray-900">
+                      {t.transaction_type?.replace(/_/g, ' ')}
+                    </span>
+                    <Badge status={t.is_active ? 'active' : 'deactivated'} />
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-gray-500 mt-1 flex-wrap">
+                    <span>Pattern: <span className="font-mono font-bold">{t.ussd_string_pattern || '— not set —'}</span></span>
+                    <span>Timeout: {t.timeout_seconds}s</span>
+                    <span>Retries: {t.retry_count ?? 0}</span>
+                    <span>v{t.version}</span>
+                  </div>
+                </div>
+                <button onClick={() => startEdit(t)}
+                  className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-primary/20 transition">
+                  Edit
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg">Edit USSD Template</h3>
+                <p className="text-sm text-gray-500">
+                  {editing.provider?.toUpperCase()} · {editing.transaction_type?.replace(/_/g, ' ')}
+                </p>
+              </div>
+              <button onClick={() => setEditing(null)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+            </div>
+            <div className="p-6 flex-1 overflow-auto">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-xs text-red-700">
+                🔒 <strong>SECURITY:</strong> Never add a <code>{'{pin}'}</code> placeholder to
+                ussd_string_pattern. When the network's response matches pin_prompt_strings,
+                the app pauses and lets the network/OS handle PIN entry — it never touches
+                the PIN in any form.
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-700">
+                💡 <strong>Example pattern:</strong> <code>*170*1*2*{'{customer_phone}'}*{'{amount}'}#</code> —
+                the entire menu path is one string, dialed once. Placeholders are substituted
+                before dialing.
+                <br /><br />
+                <strong>retry_count</strong> (0–3): only applies when the network gives NO
+                response at all to the initial dial. Once a PIN prompt has been seen, the
+                app never retries automatically, regardless of this value — that would risk
+                double-submitting a transaction that may have already succeeded.
+              </div>
+              {validationError && (
+                <div className="bg-red-100 border border-red-300 rounded-lg p-3 mb-4 text-xs text-red-800 font-medium">
+                  ⚠️ {validationError}
+                </div>
+              )}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Template JSON</label>
+              <textarea value={editJson} onChange={e => { setEditJson(e.target.value); setValidationError(null); }}
+                rows={16}
+                className="w-full font-mono text-xs border border-gray-200 rounded-lg p-3
+                  focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
+            </div>
+            <div className="p-6 border-t flex gap-3">
+              <button onClick={save} disabled={saving}
+                className="flex-1 bg-primary text-white py-2.5 rounded-lg font-semibold hover:bg-primary-dark disabled:opacity-60 transition">
+                {saving ? 'Saving...' : '✅ Save & Deploy'}
+              </button>
+              <button onClick={() => setEditing(null)}
+                className="flex-1 border border-gray-200 py-2.5 rounded-lg font-semibold text-gray-600 hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Audit Logs Page ───────────────────────────────────────────
+
+export function AuditLogsPage() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({ action: '', from_date: '', to_date: '' });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (filters.action) params.action = filters.action;
+      if (filters.from_date) params.from_date = filters.from_date;
+      if (filters.to_date) params.to_date = filters.to_date;
+      const res = await API.get('/admin/audit-logs', { params });
+      setLogs(res.data.data || []);
+    } catch (_) { toast.error('Failed to load audit logs'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const resultColor = { success: 'text-green-600', failure: 'text-red-600' };
+
+  return (
+    <div>
+      <PageHeader title="Audit Logs" subtitle="Full record of all user and system actions" />
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Action Filter</label>
+          <input value={filters.action} onChange={e => setFilters(f => ({ ...f, action: e.target.value }))}
+            placeholder="e.g. TRANSACTION"
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">From Date</label>
+          <input type="date" value={filters.from_date}
+            onChange={e => setFilters(f => ({ ...f, from_date: e.target.value }))}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">To Date</label>
+          <input type="date" value={filters.to_date}
+            onChange={e => setFilters(f => ({ ...f, to_date: e.target.value }))}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+        <button onClick={load}
+          className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-dark transition">
+          Apply
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <Table
+          loading={loading}
+          data={logs}
+          emptyMsg="No audit logs found"
+          columns={[
+            { key: 'created_at', label: 'Time',
+              render: r => r.created_at ? new Date(r.created_at).toLocaleString() : '—' },
+            { key: 'user_email', label: 'User',
+              render: r => (
+                <div>
+                  <p className="font-medium text-xs">{r.user_email || 'System'}</p>
+                  <p className="text-gray-400 text-xs">{r.user_role}</p>
+                </div>
+              )},
+            { key: 'action', label: 'Action',
+              render: r => <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{r.action}</span> },
+            { key: 'entity_type', label: 'Entity',
+              render: r => r.entity_type ? (
+                <span className="text-xs text-gray-500">{r.entity_type}</span>
+              ) : '—' },
+            { key: 'ip_address', label: 'IP',
+              render: r => <span className="font-mono text-xs">{r.ip_address || '—'}</span> },
+            { key: 'result', label: 'Result',
+              render: r => (
+                <span className={`font-semibold text-xs ${resultColor[r.result] || 'text-gray-500'}`}>
+                  {r.result?.toUpperCase()}
+                </span>
+              )},
+            { key: 'error_message', label: 'Error',
+              render: r => r.error_message ? (
+                <span className="text-xs text-red-500 truncate max-w-xs block" title={r.error_message}>
+                  {r.error_message}
+                </span>
+              ) : '—' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Commission Rules Page ─────────────────────────────────────
+
+export function CommissionsPage() {
+  const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({
+    rate_percent: '', threshold_amount: '', cap_amount: '',
+    provider_share_percent: '0.30', provider: '', transaction_type: '',
+    effective_from: new Date().toISOString().slice(0, 10),
+  });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await API.get('/commissions/rules');
+      setRules(res.data.data || []);
+    } catch (_) { toast.error('Failed to load rules'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!form.rate_percent) return toast.error('Rate is required');
+    setSaving(true);
+    try {
+      await API.post('/commissions/rules', {
+        rate_percent: parseFloat(form.rate_percent),
+        threshold_amount: form.threshold_amount ? parseFloat(form.threshold_amount) : null,
+        cap_amount: form.cap_amount ? parseFloat(form.cap_amount) : null,
+        provider_share_percent: parseFloat(form.provider_share_percent),
+        provider: form.provider || null,
+        transaction_type: form.transaction_type || null,
+        effective_from: form.effective_from,
+      });
+      toast.success('Commission rule created ✅');
+      setShowAdd(false);
+      load();
+    } catch (_) { toast.error('Failed to create rule'); }
+    finally { setSaving(false); }
+  };
+
+  const exampleCalc = (rule) => {
+    const rate = parseFloat(rule.rate_percent);
+    const threshold = rule.threshold_amount ? parseFloat(rule.threshold_amount) : null;
+    const cap = rule.cap_amount ? parseFloat(rule.cap_amount) : null;
+    const provShare = parseFloat(rule.provider_share_percent);
+
+    const amounts = [100, 500, threshold || 1000, (threshold || 1000) + 100].filter(Boolean);
+    return amounts.map(amt => {
+      let gross = amt * rate;
+      if (threshold && cap && amt >= threshold) gross = Math.min(gross, cap);
+      gross = Math.round(gross * 100) / 100;
+      // Mirror the backend's exact rounding sequence (commissionService.js):
+      // provider_share is rounded independently FIRST, then net is derived
+      // as gross - rounded(provider_share) — NOT as gross * (1 - share).
+      // Those two formulas disagree by a cent in thousands of realistic
+      // cases, which would make this preview misleading vs. real payouts.
+      const providerShare = Math.round(gross * provShare * 100) / 100;
+      const net = Math.round((gross - providerShare) * 100) / 100;
+      return { amount: amt, gross, net };
+    });
+  };
+
+  return (
+    <div>
+      <PageHeader title="Commission Rules"
+        subtitle="Global and company-specific commission structures"
+        action={
+          <button onClick={() => setShowAdd(true)}
+            className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-dark transition">
+            + Add Rule
+          </button>
+        } />
+
+      {loading ? <div className="text-center py-16 text-gray-400">Loading...</div> : (
+        <div className="grid gap-4">
+          {rules.map(rule => {
+            const examples = exampleCalc(rule);
+            return (
+              <div key={rule.id} className="bg-white rounded-xl shadow-sm p-5">
+                <div className="flex flex-wrap gap-3 items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-gray-900">
+                        {(parseFloat(rule.rate_percent) * 100).toFixed(2)}% commission
+                      </span>
+                      {rule.threshold_amount && (
+                        <span className="text-sm text-gray-500">
+                          · capped at GH₵{parseFloat(rule.cap_amount).toFixed(2)} above GH₵{parseFloat(rule.threshold_amount).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {rule.provider ? (
+                        <Badge status={rule.provider} />
+                      ) : (
+                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">All Providers</span>
+                      )}
+                      {rule.transaction_type ? (
+                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">
+                          {rule.transaction_type.replace(/_/g, ' ')}
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">All Types</span>
+                      )}
+                      {rule.company_id ? (
+                        <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">Custom Rule</span>
+                      ) : (
+                        <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Global Default</span>
+                      )}
+                      <Badge status={rule.is_active ? 'active' : 'deactivated'} />
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>Provider share: {(parseFloat(rule.provider_share_percent) * 100).toFixed(0)}%</p>
+                    <p>From: {rule.effective_from}</p>
+                  </div>
+                </div>
+
+                {/* Example calculations */}
+                <div className="border border-gray-100 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500">
+                    Example Calculations
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left px-3 py-2 text-gray-500">Transaction</th>
+                        <th className="text-left px-3 py-2 text-gray-500">Gross Commission</th>
+                        <th className="text-left px-3 py-2 text-gray-500">Net (Your Share)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {examples.map((ex, i) => (
+                        <tr key={i} className="border-b border-gray-50">
+                          <td className="px-3 py-2">GH₵ {ex.amount.toFixed(2)}</td>
+                          <td className="px-3 py-2">GH₵ {ex.gross.toFixed(2)}</td>
+                          <td className="px-3 py-2 font-semibold text-green-700">GH₵ {ex.net.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Rule Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="font-bold text-lg">Add Commission Rule</h3>
+              <button onClick={() => setShowAdd(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rate % *</label>
+                  <input type="number" step="0.01" value={form.rate_percent}
+                    onChange={e => setForm(f => ({ ...f, rate_percent: e.target.value }))}
+                    placeholder="e.g. 0.02 for 2%"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Provider Share %</label>
+                  <input type="number" step="0.01" value={form.provider_share_percent}
+                    onChange={e => setForm(f => ({ ...f, provider_share_percent: e.target.value }))}
+                    placeholder="e.g. 0.30 for 30%"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Threshold (GH₵)</label>
+                  <input type="number" value={form.threshold_amount}
+                    onChange={e => setForm(f => ({ ...f, threshold_amount: e.target.value }))}
+                    placeholder="Cap applies above this"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cap Amount (GH₵)</label>
+                  <input type="number" value={form.cap_amount}
+                    onChange={e => setForm(f => ({ ...f, cap_amount: e.target.value }))}
+                    placeholder="Max commission"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Provider (leave blank = all)</label>
+                  <select value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="">All Providers</option>
+                    <option value="mtn">MTN Mobile Money</option>
+                    <option value="telecel">Telecel Cash</option>
+                    <option value="at_money">AT Money</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Transaction Type (leave blank = all)</label>
+                  <select value={form.transaction_type} onChange={e => setForm(f => ({ ...f, transaction_type: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="">All Types</option>
+                    <option value="cash_in">Cash In</option>
+                    <option value="cash_out">Cash Out</option>
+                    <option value="send_money">Send Money</option>
+                    <option value="merchant_payment">Merchant Payment</option>
+                    <option value="bill_payment">Bill Payment</option>
+                    <option value="airtime">Airtime</option>
+                    <option value="data_bundle">Data Bundle</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Effective From</label>
+                <input type="date" value={form.effective_from}
+                  onChange={e => setForm(f => ({ ...f, effective_from: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+              </div>
+            </div>
+            <div className="p-6 border-t flex gap-3">
+              <button onClick={save} disabled={saving}
+                className="flex-1 bg-primary text-white py-2.5 rounded-lg font-semibold hover:bg-primary-dark disabled:opacity-60 transition">
+                {saving ? 'Saving...' : 'Create Rule'}
+              </button>
+              <button onClick={() => setShowAdd(false)}
+                className="flex-1 border border-gray-200 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

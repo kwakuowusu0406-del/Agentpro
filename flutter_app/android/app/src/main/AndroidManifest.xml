@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.agentpro.ghana">
+
+    <!-- ── Required Permissions ── -->
+
+    <!-- USSD dialing (required for MoMo automation) -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+
+    <!-- SIM detection -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Biometric -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+
+    <!-- Push Notifications (FCM) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Storage (for receipts and reports) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
+    <!-- NOTE: CAMERA permission intentionally omitted. image_picker is listed
+         as a dependency for a future feature (ad photos, profile pictures)
+         but is not yet used anywhere in the app. Add CAMERA back only when
+         that feature is actually built — Play Store review flags apps that
+         request dangerous permissions with no corresponding in-app feature. -->
+
+    <!-- ── Package Visibility (Android 11+ / API 30+) ──
+         Without this, launchUrl() for mailto: intents can silently fail
+         even when a real email app is installed, because targetSdk 34
+         apps cannot query other installed apps' intent filters unless
+         explicitly declared here. Only declaring what's actually used
+         (Settings → Contact Support) — add more entries here only when
+         a corresponding launchUrl() call is added for that scheme. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+
+    <!-- ── Hardware Features ── -->
+    <uses-feature android:name="android.hardware.telephony" android:required="true" />
+    <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
+
+    <application
+        android:label="Agent Pro Ghana"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/LaunchTheme"
+        android:usesCleartextTraffic="false"
+        android:hardwareAccelerated="true"
+        android:windowSoftInputMode="adjustResize">
+
+        <!-- Flutter activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Flutter deep links -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="agentproghana.com" />
+            </intent-filter>
+
+            <!-- Required for FCM notification taps to route through
+                 FirebaseMessaging.onMessageOpenedApp / getInitialMessage
+                 (see NotificationService._routeForType) when the app is
+                 backgrounded or terminated. Without this, tapping a
+                 notification just launches the app to its default route
+                 with no routing — the foreground case
+                 (FirebaseMessaging.onMessage) is unaffected since that's
+                 a separate Dart-side listener, not dependent on this
+                 intent-filter. This is NOT auto-added by the
+                 firebase_messaging plugin; it must be declared here. -->
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Firebase Cloud Messaging -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- FCM default channel -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="agentpro_notifications" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+
+        <!-- Flutter engine -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+    </application>
+</manifest>

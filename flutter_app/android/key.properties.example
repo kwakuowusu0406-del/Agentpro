@@ -1,0 +1,7 @@
+# Copy this file to key.properties (in android/ directory) and fill in your values
+# NEVER commit the real key.properties or your .jks keystore file to version control
+
+storePassword=your_keystore_password
+keyPassword=your_key_password
+keyAlias=agentpro
+storeFile=../agentpro-release.jks

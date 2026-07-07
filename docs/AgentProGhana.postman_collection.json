@@ -1,0 +1,506 @@
+{
+  "info": {
+    "name": "Agent Pro Ghana API",
+    "description": "Complete API collection for Agent Pro Ghana v2.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://api.agentproghana.com/v1" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "company_id", "value": "" },
+    { "key": "branch_id", "value": "" },
+    { "key": "transaction_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/../health", "host": ["{{base_url}}/../health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Business Owner",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/register" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"Kwame MoMo Services\",\n  \"registration_number\": \"GH-BUS-001\",\n  \"first_name\": \"Kwame\",\n  \"last_name\": \"Mensah\",\n  \"email\": \"kwame@test.com\",\n  \"phone\": \"0241234567\",\n  \"password\": \"SecurePass123\",\n  \"ghana_card_number\": \"GHA-123456789-0\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.collectionVariables.set('access_token', data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', data.refresh_token);",
+                  "  pm.collectionVariables.set('company_id', data.user.company_id || '');",
+                  "  console.log('Logged in as:', data.user.email, '| Role:', data.user.role);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/login" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@agentproghana.com\",\n  \"password\": \"ChangeMe123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('access_token', pm.response.json().data.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/refresh" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/auth/me" }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/forgot-password" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@test.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/logout" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Branches",
+      "item": [
+        {
+          "name": "List Branches",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/branches" }
+          }
+        },
+        {
+          "name": "Create Branch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('branch_id', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/branches" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Accra Central Branch\",\n  \"location\": \"Accra, Greater Accra\",\n  \"phone\": \"0241234567\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Branch",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/branches/{{branch_id}}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Initiate Cash In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('transaction_id', pm.response.json().data.transaction_id);",
+                  "  console.log('Transaction ID:', pm.response.json().data.transaction_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/transactions" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"mtn\",\n  \"transaction_type\": \"cash_in\",\n  \"amount\": 250.00,\n  \"branch_id\": \"{{branch_id}}\",\n  \"customer_phone\": \"0241234567\",\n  \"customer_name\": \"Ama Owusu\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Complete Transaction (Success)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/transactions/{{transaction_id}}/complete" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"success\",\n  \"network_reference\": \"MTN123456789\",\n  \"ussd_session_log\": [\n    {\"type\": \"dial\", \"dialed\": \"*170*1*2*0241234567*250#\", \"timestamp\": \"2026-07-04T10:00:00.000Z\"},\n    {\"type\": \"response\", \"response\": \"Cash out successful. New balance: GHS 4750.00\", \"timestamp\": \"2026-07-04T10:00:08.000Z\"}\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Complete Transaction (Pending Confirmation)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/transactions/{{transaction_id}}/complete" },
+            "description": "pending_confirmation means the app dialed successfully and saw a PIN prompt, but never received a further response confirming success or failure — this can happen because Android's public USSD API does not guarantee a second callback after a PIN prompt resolves. Float and commission are NOT updated for this status, since the transaction may have actually succeeded.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending_confirmation\",\n  \"failure_reason\": \"Could not confirm the outcome after PIN entry. Please verify with the customer or check your transaction history before repeating this transaction.\",\n  \"ussd_session_log\": [\n    {\"type\": \"dial\", \"dialed\": \"*170*1*2*0241234567*250#\", \"timestamp\": \"2026-07-04T10:00:00.000Z\"},\n    {\"type\": \"response\", \"response\": \"Enter your PIN\", \"timestamp\": \"2026-07-04T10:00:04.000Z\"},\n    {\"type\": \"pin_prompt_seen\", \"response\": \"[PIN ENTRY \\u2014 NOT LOGGED, NOT APP-VISIBLE]\", \"timestamp\": \"2026-07-04T10:00:04.100Z\"}\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/transactions?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "provider", "value": "mtn", "disabled": true },
+                { "key": "status", "value": "success", "disabled": true },
+                { "key": "from_date", "value": "2024-01-01T00:00:00Z", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/transactions/{{transaction_id}}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Float",
+      "item": [
+        {
+          "name": "Float Overview",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/float/overview" }
+          }
+        },
+        {
+          "name": "Branch Float",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/float/branch/{{branch_id}}" }
+          }
+        },
+        {
+          "name": "Top Up Float",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/float/top-up" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branch_id\": \"{{branch_id}}\",\n  \"provider\": \"mtn\",\n  \"amount\": 5000.00,\n  \"reference\": \"TOPUP001\",\n  \"notes\": \"Weekly top-up\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Float History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/float/history?branch_id={{branch_id}}",
+              "query": [{ "key": "branch_id", "value": "{{branch_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/reports/dashboard" }
+          }
+        },
+        {
+          "name": "Transaction Report (PDF)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/reports/transactions?format=pdf&period=month",
+              "query": [
+                { "key": "format", "value": "pdf" },
+                { "key": "period", "value": "month" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Transaction Report (CSV)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/reports/transactions?format=csv&period=month",
+              "query": [
+                { "key": "format", "value": "csv" },
+                { "key": "period", "value": "month" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Commission Report",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/reports/commissions?format=pdf&period=month&group_by=day",
+              "query": [
+                { "key": "format", "value": "pdf" },
+                { "key": "period", "value": "month" },
+                { "key": "group_by", "value": "day" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Assistant",
+      "item": [
+        {
+          "name": "Chat - New Conversation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.environment.set('conversation_id', pm.response.json().data.conversation_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/ai/chat" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"How do I process a Cash In transaction?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Chat - Continue Conversation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/ai/chat" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What do I do if the transaction fails?\",\n  \"conversation_id\": \"{{conversation_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Conversations",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/ai/conversations" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "Get Subscription Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/subscriptions/status" }
+          }
+        },
+        {
+          "name": "Submit Payment Reference",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/subscriptions/payment" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"momo_reference\": \"MTN240101123456\",\n  \"payment_phone\": \"0241234567\",\n  \"amount\": 10.00\n}"
+            }
+          }
+        },
+        {
+          "name": "[Superuser] List Pending Payments",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/subscriptions/pending-payments" }
+          }
+        },
+        {
+          "name": "[Superuser] Approve Payment",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/subscriptions/payment/PAYMENT_ID/verify" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Platform Overview",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/admin/overview" }
+          }
+        },
+        {
+          "name": "Pending Registrations",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/admin/pending-registrations" }
+          }
+        },
+        {
+          "name": "Get System Config",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/admin/config" }
+          }
+        },
+        {
+          "name": "Update System Config",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/admin/config/agent_pro_momo_number" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"0241234567\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List USSD Templates",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/admin/ussd-templates" }
+          }
+        },
+        {
+          "name": "Audit Logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/audit-logs?limit=50",
+              "query": [{ "key": "limit", "value": "50" }]
+            }
+          }
+        },
+        {
+          "name": "Pending Ads",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/admin/ads/pending" }
+          }
+        }
+      ]
+    }
+  ]
+}
