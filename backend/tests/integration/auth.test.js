@@ -121,8 +121,6 @@ describe('Protected Routes', () => {
 
 // ─── Health Check ─────────────────────────────────────────────
 
-// ─── Health Check ─────────────────────────────────────────────
-
 describe('GET /health', () => {
   it('returns health status', async () => {
     const res = await request(app).get('/health');
