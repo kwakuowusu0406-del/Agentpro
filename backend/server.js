@@ -153,9 +153,13 @@ async function startServer() {
     await connectRedis();
     logger.info('✅ Redis connected');
 
-    // Initialize Firebase
-    initFirebase();
-    logger.info('✅ Firebase initialized');
+// Initialize Firebase (skip during tests)
+if (process.env.NODE_ENV !== 'test') {
+  initFirebase();
+  logger.info('✅ Firebase initialized');
+} else {
+  logger.info('⏭️ Skipping Firebase initialization in test environment');
+};
 
     // Start background job scheduler (production only)
     if (process.env.NODE_ENV === 'production') {
