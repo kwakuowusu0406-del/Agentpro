@@ -261,7 +261,7 @@ describe('Input Validation', () => {
   });
 
   it('validates MoMo reference format', () => {
-    const isValidRef = (ref) => ref && ref.trim().length >= 5;
+    const isValidRef = (ref) => Boolean(ref && ref.trim().length >= 5);
     expect(isValidRef('APG12345')).toBe(true);
     expect(isValidRef('AB123')).toBe(true);
     expect(isValidRef('AB')).toBe(false);
