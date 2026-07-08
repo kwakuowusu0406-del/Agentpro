@@ -177,6 +177,7 @@ if (process.env.NODE_ENV !== 'test') {
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
 
 module.exports = app; // for testing
