@@ -20,13 +20,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void initState() { super.initState(); _load(); }
 
   Future<void> _load([String? search]) async {
-    setState(() => _loading = true);
-    try {
-      final res = await ApiClient.instance.get('/marketplace',
-        queryParameters: if (search != null && search.isNotEmpty) {'search': search} else {});
-      if (mounted) setState(() { _ads = res.data['data'] ?? []; _loading = false; });
-    } catch (_) { if (mounted) setState(() => _loading = false); }
+  setState(() => _loading = true);
+  try {
+    final res = await ApiClient.instance.get('/marketplace',
+      queryParameters: (search != null && search.isNotEmpty) ? {'search': search} : {},
+    );
+    if (mounted) setState(() {
+      _ads = res.data['data'] ?? [];
+      _loading = false;
+    });
+  } catch (_) {
+    if (mounted) setState(() => _loading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {
