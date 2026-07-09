@@ -1,4 +1,61 @@
 const request = require('supertest');
+
+// Setup mocks BEFORE requiring server
+process.env.NODE_ENV = 'test';
+process.env.JWT_ACCESS_SECRET = 'test-secret-key';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.BCRYPT_ROUNDS = '10';
+process.env.APP_NAME = 'Agent Pro Ghana';
+
+const mockQuery = jest.fn().mockResolvedValue({ rows: [] });
+
+const mockRedisClient = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  on: jest.fn(),
+  ping: jest.fn().mockResolvedValue('PONG'),
+  exists: jest.fn().mockResolvedValue(0),
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue('OK'),
+  setex: jest.fn().mockResolvedValue('OK'),
+  del: jest.fn().mockResolvedValue(0),
+  status: 'ready'
+};
+
+jest.mock('../../src/config/database', () => ({
+  connectDB: jest.fn().mockResolvedValue(undefined),
+  query: mockQuery,
+  pool: { query: mockQuery },
+  withTransaction: jest.fn((cb) => cb({ query: mockQuery }))
+}));
+
+jest.mock('../../src/config/redis', () => ({
+  connectRedis: jest.fn().mockResolvedValue(undefined),
+  redisClient: mockRedisClient,
+  isTokenBlacklisted: jest.fn().mockResolvedValue(0),
+  blacklistToken: jest.fn().mockResolvedValue(undefined),
+  setCache: jest.fn().mockResolvedValue('OK'),
+  getCache: jest.fn().mockResolvedValue(null),
+  deleteCache: jest.fn().mockResolvedValue(0),
+  storeOTP: jest.fn().mockResolvedValue('OK'),
+  getOTP: jest.fn().mockResolvedValue(null),
+  deleteOTP: jest.fn().mockResolvedValue(0)
+}));
+
+jest.mock('../../src/config/firebase', () => ({
+  initFirebase: jest.fn(),
+  sendNotification: jest.fn().mockResolvedValue(undefined)
+}));
+
+jest.mock('../../src/services/emailService', () => ({
+  sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+  sendWelcomeEmail: jest.fn().mockResolvedValue(undefined)
+}));
+
+jest.mock('../../src/services/auditService', () => ({
+  auditLog: jest.fn().mockResolvedValue(undefined)
+}));
+
+// NOW import server after mocks are set
 const app = require('../../server');
 
 // ─── Auth Integration Tests ───────────────────────────────────
