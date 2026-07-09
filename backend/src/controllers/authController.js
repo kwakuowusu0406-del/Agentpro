@@ -253,7 +253,8 @@ exports.login = async (req, res) => {
 
   } catch (error) {
     logger.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
+    // Return 401 instead of 500 when database is unavailable
+    res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
 };
 

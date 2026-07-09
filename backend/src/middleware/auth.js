@@ -19,12 +19,17 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
 
     // Check blacklist
-    const blacklisted = await isTokenBlacklisted(token);
-    if (blacklisted) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token has been revoked. Please login again.'
-      });
+    try {
+      const blacklisted = await isTokenBlacklisted(token);
+      if (blacklisted) {
+        return res.status(401).json({
+          success: false,
+          message: 'Token has been revoked. Please login again.'
+        });
+      }
+    } catch (e) {
+      logger.error('Blacklist check error:', e);
+      // Continue if blacklist check fails - don't block request
     }
 
     // Verify token
@@ -54,7 +59,7 @@ const authenticate = async (req, res, next) => {
       });
     }
     logger.error('Auth middleware error:', error);
-    return res.status(500).json({ success: false, message: 'Authentication failed' });
+    return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };
 

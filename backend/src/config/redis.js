@@ -31,55 +31,98 @@ function connectRedis() {
  * Set key with optional TTL (seconds)
  */
 async function setCache(key, value, ttlSeconds = null) {
-  const serialized = JSON.stringify(value);
-  if (ttlSeconds) {
-    return redisClient.setex(`agentpro:${key}`, ttlSeconds, serialized);
+  try {
+    const serialized = JSON.stringify(value);
+    if (ttlSeconds) {
+      return redisClient.setex(`agentpro:${key}`, ttlSeconds, serialized);
+    }
+    return redisClient.set(`agentpro:${key}`, serialized);
+  } catch (error) {
+    logger.error('Cache set error:', error);
+    return null;
   }
-  return redisClient.set(`agentpro:${key}`, serialized);
 }
 
 /**
  * Get cached value
  */
 async function getCache(key) {
-  const value = await redisClient.get(`agentpro:${key}`);
-  return value ? JSON.parse(value) : null;
+  try {
+    const value = await redisClient.get(`agentpro:${key}`);
+    return value ? JSON.parse(value) : null;
+  } catch (error) {
+    logger.error('Cache get error:', error);
+    return null;
+  }
 }
 
 /**
  * Delete cached value
  */
 async function deleteCache(key) {
-  return redisClient.del(`agentpro:${key}`);
+  try {
+    return redisClient.del(`agentpro:${key}`);
+  } catch (error) {
+    logger.error('Cache delete error:', error);
+    return null;
+  }
 }
 
 /**
  * Blacklist a JWT token (for logout / revocation)
  */
 async function blacklistToken(token, expiresIn) {
-  return redisClient.setex(`blacklist:${token}`, expiresIn, '1');
+  try {
+    return redisClient.setex(`blacklist:${token}`, expiresIn, '1');
+  } catch (error) {
+    logger.error('Blacklist token error:', error);
+    return null;
+  }
 }
 
 /**
  * Check if token is blacklisted
  */
 async function isTokenBlacklisted(token) {
-  return redisClient.exists(`blacklist:${token}`);
+  try {
+    if (!redisClient) {
+      return 0; // Not blacklisted if Redis unavailable
+    }
+    return await redisClient.exists(`blacklist:${token}`);
+  } catch (error) {
+    logger.error('Blacklist check error:', error);
+    return 0; // Not blacklisted if check fails
+  }
 }
 
 /**
  * Store OTP or reset token
  */
 async function storeOTP(key, value, ttlSeconds = 3600) {
-  return redisClient.setex(`otp:${key}`, ttlSeconds, value);
+  try {
+    return redisClient.setex(`otp:${key}`, ttlSeconds, value);
+  } catch (error) {
+    logger.error('OTP store error:', error);
+    return null;
+  }
 }
 
 async function getOTP(key) {
-  return redisClient.get(`otp:${key}`);
+  try {
+    return redisClient.get(`otp:${key}`);
+  } catch (error) {
+    logger.error('OTP get error:', error);
+    return null;
+  }
 }
 
 async function deleteOTP(key) {
-  return redisClient.del(`otp:${key}`);
+  try {
+    return redisClient.del(`otp:${key}`);
+  } catch (error) {
+    logger.error('OTP delete error:', error);
+    return null;
+  }
 }
 
 module.exports = {
