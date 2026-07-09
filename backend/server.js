@@ -79,15 +79,13 @@ app.get('/health', async (req, res) => {
     const { pool } = require('./src/config/database');
     const { redisClient } = require('./src/config/redis');
 
-    let dbStatus = 'unknown';
-    let redisStatus = 'unknown';
+    let dbStatus = 'unhealthy';
+    let redisStatus = 'unhealthy';
 
     try {
-      if (pool && pool.query) {
+      if (pool && typeof pool.query === 'function') {
         await pool.query('SELECT 1');
         dbStatus = 'healthy';
-      } else {
-        dbStatus = 'unhealthy';
       }
     } catch (e) {
       dbStatus = 'unhealthy';
@@ -97,8 +95,6 @@ app.get('/health', async (req, res) => {
       if (redisClient && typeof redisClient.ping === 'function') {
         await redisClient.ping();
         redisStatus = 'healthy';
-      } else {
-        redisStatus = 'unhealthy';
       }
     } catch (e) {
       redisStatus = 'unhealthy';
@@ -115,12 +111,12 @@ app.get('/health', async (req, res) => {
     });
   } catch (error) {
     logger.error('Health check error:', error);
-    res.status(500).json({
+    res.status(503).json({
       success: false,
       app: process.env.APP_NAME || 'Agent Pro Ghana',
       version: '2.0.0',
       timestamp: new Date().toISOString(),
-      message: 'Health check failed'
+      services: { database: 'unhealthy', redis: 'unhealthy' }
     });
   }
 });
@@ -157,7 +153,7 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ============================================================
-// START SERVER
+// START SERVER (only if running directly, not in tests)
 // ============================================================
 
 const PORT = process.env.PORT || 3000;
@@ -196,6 +192,7 @@ async function startServer() {
   }
 }
 
+// Only start server if running directly (not imported by tests)
 if (require.main === module) {
   startServer();
 }

@@ -1,5 +1,6 @@
 /**
- * Test setup: Mock ALL external dependencies BEFORE server.js loads
+ * Test setup: Mock ALL external dependencies BEFORE any requires
+ * This prevents real database/Redis connections during tests
  */
 
 process.env.NODE_ENV = 'test';
@@ -8,9 +9,8 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 process.env.BCRYPT_ROUNDS = '10';
 process.env.APP_NAME = 'Agent Pro Ghana';
 
-// CRITICAL: Mock modules BEFORE server.js requires them
+// Mock database queries to return empty results
 const mockQuery = jest.fn().mockImplementation((sql, params) => {
-  // Return empty result for all queries
   return Promise.resolve({ rows: [] });
 });
 
@@ -26,7 +26,7 @@ const mockRedisClient = {
   status: 'ready'
 };
 
-// Mock database module
+// Mock database module - returns empty result sets
 jest.doMock('../src/config/database', () => ({
   connectDB: jest.fn().mockResolvedValue(undefined),
   query: mockQuery,
@@ -34,10 +34,9 @@ jest.doMock('../src/config/database', () => ({
     query: mockQuery
   },
   withTransaction: jest.fn((callback) => {
-    const mockClient = {
+    return callback({
       query: mockQuery
-    };
-    return callback(mockClient);
+    });
   })
 }));
 
