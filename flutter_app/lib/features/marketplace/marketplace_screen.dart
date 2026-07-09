@@ -1,4 +1,5 @@
 // marketplace_screen.dart
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../shared/theme/app_theme.dart';
