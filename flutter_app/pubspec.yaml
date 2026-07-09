@@ -35,7 +35,6 @@ dependencies:
   firebase_crashlytics: ^4.0.3
 
   # UI
-  material_color_utilities: ^0.08.0
   google_fonts: ^6.2.1
   cached_network_image: ^3.3.1
   flutter_svg: ^2.0.10+1
@@ -59,7 +58,7 @@ dependencies:
   permission_handler: ^11.3.1
 
   # Date/Time
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Phone formatting
   phone_form_field: ^10.0.0
