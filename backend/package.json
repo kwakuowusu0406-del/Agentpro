@@ -8,8 +8,13 @@
     "dev": "nodemon server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "test": "jest --runInBand --forceExit",
+    "test": "NODE_ENV=test jest --runInBand --forceExit",
     "test:watch": "jest --watch"
+  },
+  "jest": {
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testEnvironment": "node",
+    "collectCoverageFrom": ["src/**/*.js", "!src/**/*.test.js"]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",

@@ -82,15 +82,23 @@ app.get('/health', async (req, res) => {
   let redisStatus = 'unknown';
 
   try {
-    await pool.query('SELECT 1');
-    dbStatus = 'healthy';
+    if (pool) {
+      await pool.query('SELECT 1');
+      dbStatus = 'healthy';
+    } else {
+      dbStatus = 'unhealthy';
+    }
   } catch (e) {
     dbStatus = 'unhealthy';
   }
 
   try {
-    await redisClient.ping();
-    redisStatus = 'healthy';
+    if (redisClient && redisClient.ping) {
+      await redisClient.ping();
+      redisStatus = 'healthy';
+    } else {
+      redisStatus = 'unhealthy';
+    }
   } catch (e) {
     redisStatus = 'unhealthy';
   }
@@ -99,7 +107,7 @@ app.get('/health', async (req, res) => {
 
   res.status(status).json({
     success: status === 200,
-    app: process.env.APP_NAME,
+    app: process.env.APP_NAME || 'Agent Pro Ghana',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
     services: { database: dbStatus, redis: redisStatus }

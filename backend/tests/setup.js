@@ -1,25 +1,32 @@
-// Set test environment variables before any module loads
-process.env.NODE_ENV = 'test';
-process.env.PORT = '3001';
-process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/agentpro_test';
-process.env.REDIS_URL = 'redis://localhost:6379';
-process.env.JWT_ACCESS_SECRET = 'test-access-secret-min-64-chars-padding-padding-padding-padding';
-process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-min-64-chars-padding-padding-padding-padding';
-process.env.JWT_ACCESS_EXPIRES_IN = '15m';
-process.env.JWT_REFRESH_EXPIRES_IN = '30d';
-process.env.BCRYPT_ROUNDS = '4';
-process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
-process.env.FIREBASE_PROJECT_ID = 'test-project';
-process.env.FIREBASE_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nMIItest\n-----END PRIVATE KEY-----\n';
-process.env.FIREBASE_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com';
-process.env.CLOUDINARY_CLOUD_NAME = 'test';
-process.env.CLOUDINARY_API_KEY = 'test';
-process.env.CLOUDINARY_API_SECRET = 'test';
-process.env.SMTP_HOST = 'localhost';
-process.env.SMTP_PORT = '1025';
-process.env.SMTP_USER = 'test@test.com';
-process.env.SMTP_PASS = 'test';
-process.env.SMTP_FROM = 'test@test.com';
-process.env.RATE_LIMIT_WINDOW_MS = '60000';
-process.env.RATE_LIMIT_MAX_REQUESTS = '100';
-process.env.LOG_LEVEL = 'error'; // Suppress logs during tests
+/**
+ * Test setup: Mock Redis to avoid connection failures in CI/CD
+ */
+
+// Mock redis client for testing
+const mockRedisClient = {
+  connect: jest.fn().mockResolvedValue(undefined),
+  on: jest.fn(),
+  set: jest.fn().mockResolvedValue('OK'),
+  get: jest.fn().mockResolvedValue(null),
+  del: jest.fn().mockResolvedValue(0),
+  exists: jest.fn().mockResolvedValue(0),  // Token not blacklisted
+  setex: jest.fn().mockResolvedValue('OK'),
+  quit: jest.fn().mockResolvedValue(undefined),
+  status: 'ready',
+  ping: jest.fn().mockResolvedValue('PONG')
+};
+
+jest.mock('../src/config/redis', () => ({
+  connectRedis: jest.fn().mockResolvedValue(undefined),
+  setCache: jest.fn().mockResolvedValue('OK'),
+  getCache: jest.fn().mockResolvedValue(null),
+  deleteCache: jest.fn().mockResolvedValue(0),
+  blacklistToken: jest.fn().mockResolvedValue('OK'),
+  isTokenBlacklisted: jest.fn().mockResolvedValue(0),  // Token not blacklisted
+  storeOTP: jest.fn().mockResolvedValue('OK'),
+  getOTP: jest.fn().mockResolvedValue(null),
+  deleteOTP: jest.fn().mockResolvedValue(0),
+  redisClient: mockRedisClient
+}));
+
+module.exports = {};
