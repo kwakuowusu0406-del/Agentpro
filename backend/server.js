@@ -75,35 +75,50 @@ app.use('/api/', apiLimiter);
 // ============================================================
 
 app.get('/health', async (req, res) => {
-  const { pool } = require('./src/config/database');
-  const { redisClient } = require('./src/config/redis');
-
-  let dbStatus = 'unknown';
-  let redisStatus = 'unknown';
-
   try {
-    await pool.query('SELECT 1');
-    dbStatus = 'healthy';
-  } catch (e) {
-    dbStatus = 'unhealthy';
+    const { pool } = require('./src/config/database');
+    const { redisClient } = require('./src/config/redis');
+
+    let dbStatus = 'unhealthy';
+    let redisStatus = 'unhealthy';
+
+    try {
+      if (pool && typeof pool.query === 'function') {
+        await pool.query('SELECT 1');
+        dbStatus = 'healthy';
+      }
+    } catch (e) {
+      dbStatus = 'unhealthy';
+    }
+
+    try {
+      if (redisClient && typeof redisClient.ping === 'function') {
+        await redisClient.ping();
+        redisStatus = 'healthy';
+      }
+    } catch (e) {
+      redisStatus = 'unhealthy';
+    }
+
+    const status = dbStatus === 'healthy' && redisStatus === 'healthy' ? 200 : 503;
+
+    res.status(status).json({
+      success: status === 200,
+      app: process.env.APP_NAME || 'Agent Pro Ghana',
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      services: { database: dbStatus, redis: redisStatus }
+    });
+  } catch (error) {
+    logger.error('Health check error:', error);
+    res.status(503).json({
+      success: false,
+      app: process.env.APP_NAME || 'Agent Pro Ghana',
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      services: { database: 'unhealthy', redis: 'unhealthy' }
+    });
   }
-
-  try {
-    await redisClient.ping();
-    redisStatus = 'healthy';
-  } catch (e) {
-    redisStatus = 'unhealthy';
-  }
-
-  const status = dbStatus === 'healthy' && redisStatus === 'healthy' ? 200 : 503;
-
-  res.status(status).json({
-    success: status === 200,
-    app: process.env.APP_NAME,
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    services: { database: dbStatus, redis: redisStatus }
-  });
 });
 
 // ============================================================
@@ -138,7 +153,7 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ============================================================
-// START SERVER
+// START SERVER (only if running directly, not in tests)
 // ============================================================
 
 const PORT = process.env.PORT || 3000;
@@ -153,13 +168,13 @@ async function startServer() {
     await connectRedis();
     logger.info('✅ Redis connected');
 
-// Initialize Firebase (skip during tests)
-if (process.env.NODE_ENV !== 'test') {
-  initFirebase();
-  logger.info('✅ Firebase initialized');
-} else {
-  logger.info('⏭️ Skipping Firebase initialization in test environment');
-};
+    // Initialize Firebase (skip during tests)
+    if (process.env.NODE_ENV !== 'test') {
+      initFirebase();
+      logger.info('✅ Firebase initialized');
+    } else {
+      logger.info('⏭️  Skipping Firebase initialization in test environment');
+    }
 
     // Start background job scheduler (production only)
     if (process.env.NODE_ENV === 'production') {
@@ -171,12 +186,13 @@ if (process.env.NODE_ENV !== 'test') {
       logger.info(`🚀 Agent Pro Ghana API running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
     });
-    } catch (error) {
+  } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
+// Only start server if running directly (not imported by tests)
 if (require.main === module) {
   startServer();
 }

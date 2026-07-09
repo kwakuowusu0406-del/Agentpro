@@ -7,5 +7,11 @@ module.exports = {
   coveragePathIgnorePatterns: ['/node_modules/', '/tests/'],
   testTimeout: 15000,
   verbose: true,
-  setupFiles: ['./tests/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
+  testPathIgnorePatterns: ['/node_modules/'],
+  clearMocks: true,
+  resetMocks: true
 };
