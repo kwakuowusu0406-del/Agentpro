@@ -36,9 +36,10 @@ class _AgentDashboardState extends State<AgentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.read<AuthBloc>().state is AuthAuthenticated
+    final Map<String, dynamic> user =
+    context.read<AuthBloc>().state is AuthAuthenticated
         ? (context.read<AuthBloc>().state as AuthAuthenticated).user
-        : {};
+        : <String, dynamic>{};
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
